@@ -12,6 +12,11 @@ from rest_framework.permissions import AllowAny
 from django.contrib.auth import authenticate
 from .serializers import *
 from rest_framework.permissions import IsAuthenticated
+from google.oauth2 import id_token
+from google.auth.transport import requests
+from django.conf import settings
+
+google_client_id = settings.SOCIAL_AUTH_GOOGLE_OAUTH2_KEY
 # Create your views here.
 class RegisterView(APIView):
     """
@@ -146,6 +151,46 @@ class LoginView(APIView):
             'data': UserSerializer(user).data
         }, status=status.HTTP_200_OK)
 
+class GoogleLoginAPIView(APIView):
+    def post(self, request):
+        token = request.data.get('id_token')
+        if not token:
+            return Response({'detail': 'Missing id_token'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Verify the token
+            idinfo = id_token.verify_oauth2_token(token, requests.Request(), google_client_id)
+
+            email = idinfo.get('email')
+            full_name = idinfo.get('name') or f"{idinfo.get('given_name', '')} {idinfo.get('family_name', '')}".strip()
+            picture = idinfo.get('picture', '')
+
+            if not email:
+                return Response({'detail': 'Email not found in token'}, status=status.HTTP_400_BAD_REQUEST)
+
+            user, created = User.objects.get_or_create(email=email)
+
+            if created:
+                user.full_name = full_name
+                user.image = picture if picture else 'default.jpg'
+                user.is_active = True
+                user.google_id = idinfo.get('sub')
+                user.set_unusable_password()
+                user.save()
+
+            refresh = RefreshToken.for_user(user)
+            return Response({
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+                'user': {
+                    'id': user.id,
+                    'email': user.email,
+                    'full_name': user.full_name,
+                }
+            })
+
+        except ValueError:
+            return Response({'detail': 'Invalid token'}, status=status.HTTP_400_BAD_REQUEST)
 
 class AdminLoginView(APIView):
     """

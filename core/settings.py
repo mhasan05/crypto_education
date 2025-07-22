@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     'settings',
     'tutorials',
     'notifications',
+    'social_django',
 ]
 
 MIDDLEWARE = [
@@ -167,3 +168,18 @@ DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 # AWS_DEFAULT_ACL =  os.getenv('AWS_DEFAULT_ACL')
 # AWS_S3_VERIFY = os.getenv('AWS_S3_VERIFY')
 # DEFAULT_FILE_STORAGE = os.getenv('DEFAULT_FILE_STORAGE')
+
+
+AUTHENTICATION_BACKENDS = (
+    'social_core.backends.google.GoogleOAuth2',
+    'django.contrib.auth.backends.ModelBackend',
+)
+
+
+# settings.py
+
+SOCIAL_AUTH_GOOGLE_OAUTH2_KEY = os.getenv('GOOGLE_CLIENT_ID')  # or hardcode it
+SOCIAL_AUTH_GOOGLE_OAUTH2_SECRET = os.getenv('GOOGLE_CLIENT_SECRET')
+
+
+

@@ -6,6 +6,7 @@ urlpatterns = [
     path('verify_email/', views.VerifyEmailView.as_view(), name='verify_email'),
     path('send_otp/', views.SendOtpView.as_view(), name='send_otp'),
     path('login/', views.LoginView.as_view(), name='login'),
+    path('google_login/', views.GoogleLoginAPIView.as_view(), name='google_login'),
     path('admin_login/', views.AdminLoginView.as_view(), name='admin_login'),
     path('change_password/', views.ChangePasswordView.as_view(), name='change_password'),
     path('forgot_password/', views.ForgotPasswordView.as_view(), name='forgot_password'),
