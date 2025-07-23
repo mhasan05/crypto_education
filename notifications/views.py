@@ -27,7 +27,7 @@ class NotificationUnreadListAPIView(APIView):
 class NotificationMarkAsReadAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
-    def post(self, request, pk):
+    def get(self, request, pk):
         try:
             notification = Notification.objects.get(id=pk, user=request.user)
             notification.is_read = True
@@ -42,7 +42,7 @@ class NotificationMarkAsReadAPIView(APIView):
 class NotificationMarkAllAsReadAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
-    def post(self, request):
+    def get(self, request):
         updated_count = Notification.objects.filter(user=request.user, is_read=False).update(is_read=True)
         return Response({
             "status": "success",
