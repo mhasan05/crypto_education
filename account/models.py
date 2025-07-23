@@ -14,7 +14,8 @@ class User(AbstractBaseUser, PermissionsMixin):
     user_id = models.AutoField(primary_key=True)
     full_name = models.CharField(max_length=50)
     email = models.EmailField(max_length=100, unique=True)
-    image = models.ImageField(upload_to='profile_images', default='default.jpg')
+    image = models.ImageField(upload_to='profile_images', default='profile_images/default.jpg')
+    google_image_url = models.URLField(blank=True, null=True)
     role = models.CharField(max_length=20, default='user')
     language = models.CharField(max_length=20,choices=LANGUAGE_CHOICES,default='english')
     subscription = models.CharField(max_length=20, default='free')
@@ -28,10 +29,18 @@ class User(AbstractBaseUser, PermissionsMixin):
     date_joined = models.DateTimeField(default=timezone.now)
     last_login = models.DateTimeField(auto_now=True)
 
+    @property
+    def image_url(self):
+        if self.google_image_url:
+            return self.google_image_url
+        else:
+            return self.image.url
+
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['full_name']
 
     objects = UserManager()
+
 
     def __str__(self):
         return str(self.full_name)

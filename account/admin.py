@@ -11,7 +11,7 @@ class UserAuthAdmin(UserAdmin):
 
     fieldsets = (
     ('Login credential', {'fields': ('email', 'google_id', 'password')}),
-    ('Personal Info', {'fields': ('full_name', 'image', 'role', 'language', 'subscription', 'videos_progress')}),
+    ('Personal Info', {'fields': ('full_name', 'image','google_image_url', 'role', 'language', 'subscription', 'videos_progress')}),
     ('verification', {'fields': ('otp', 'otp_expired')}),
     ('Permissions', {'fields': ('is_active', 'is_staff', 'is_superuser')}),
     ('Important dates', {'fields': ('date_joined',)}), 

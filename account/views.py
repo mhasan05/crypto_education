@@ -164,6 +164,7 @@ class GoogleLoginAPIView(APIView):
             email = idinfo.get('email')
             full_name = idinfo.get('name') or f"{idinfo.get('given_name', '')} {idinfo.get('family_name', '')}".strip()
             picture = idinfo.get('picture', '')
+            print(f"Google Image: {picture}")
 
             if not email:
                 return Response({'detail': 'Email not found in token'}, status=status.HTTP_400_BAD_REQUEST)
@@ -172,7 +173,7 @@ class GoogleLoginAPIView(APIView):
 
             if created:
                 user.full_name = full_name
-                user.image = picture if picture else 'default.jpg'
+                user.google_image_url = picture
                 user.is_active = True
                 user.google_id = idinfo.get('sub')
                 user.set_unusable_password()
@@ -180,12 +181,25 @@ class GoogleLoginAPIView(APIView):
 
             refresh = RefreshToken.for_user(user)
             return Response({
-                'refresh': str(refresh),
+                "status": "success",
                 'access': str(refresh.access_token),
                 'user': {
-                    'id': user.id,
-                    'email': user.email,
+                    'user_id': user.user_id,
                     'full_name': user.full_name,
+                    'email': user.email,
+                    'image': user.google_image_url,
+                    'role': user.role,
+                    'language': user.language,
+                    'subscription': user.subscription,
+                    'google_id': user.google_id,
+                    'videos_progress': user.videos_progress,
+                    'is_active': user.is_active,
+                    'is_staff': user.is_staff,
+                    'is_superuser': user.is_superuser,
+                    'otp': user.otp,
+                    'otp_expired': user.otp_expired,
+                    'date_joined': user.date_joined,
+                    'last_login': user.last_login
                 }
             })
 
@@ -302,7 +316,7 @@ class UserProfileView(APIView):
                 return Response({'status': 'error',"message": "User profile not found."}, status=status.HTTP_404_NOT_FOUND)
         
 
-    def put(self, request):
+    def patch(self, request):
         user = request.user
         data = request.data.copy()
 
