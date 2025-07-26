@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     'tutorials',
     'notifications',
     'social_django',
+    'ai',
 ]
 
 MIDDLEWARE = [

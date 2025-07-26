@@ -11,16 +11,16 @@ class LiveClassListCreateAPIView(APIView):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
     def get(self, request):
-        classes = LiveClass.objects.all().order_by('-date_time')
+        classes = LiveClass.objects.all().order_by('-created_at')
         serializer = LiveClassSerializer(classes, many=True)
         return Response({"status": "success", "data": serializer.data}, status=status.HTTP_200_OK)
 
-    def post(self, request):
-        serializer = LiveClassSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response({"status": "success", "data": serializer.data}, status=status.HTTP_201_CREATED)
-        return Response({"status": "error", "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+    # def post(self, request):
+    #     serializer = LiveClassSerializer(data=request.data)
+    #     if serializer.is_valid():
+    #         serializer.save()
+    #         return Response({"status": "success", "data": serializer.data}, status=status.HTTP_201_CREATED)
+    #     return Response({"status": "error", "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class LiveClassRetrieveUpdateDeleteAPIView(APIView):
@@ -39,22 +39,29 @@ class LiveClassRetrieveUpdateDeleteAPIView(APIView):
         serializer = LiveClassSerializer(live_class)
         return Response({"status": "success", "data": serializer.data})
 
-    def put(self, request, pk):
+    def put(self, request, pk=3):
         live_class = self.get_object(pk)
         if not live_class:
             return Response({"status": "error", "message": "Not found"}, status=status.HTTP_404_NOT_FOUND)
-        serializer = LiveClassSerializer(live_class, data=request.data, partial=True)
+        data = request.data.copy()
+
+        # Only allow admin to change restricted fields
+        restricted_fields = ['is_active']
+        if not request.user.is_superuser:
+            for field in restricted_fields:
+                data.pop(field, None)
+        serializer = LiveClassSerializer(live_class, data=data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response({"status": "success", "data": serializer.data})
         return Response({"status": "error", "errors": serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
-    def delete(self, request, pk):
-        live_class = self.get_object(pk)
-        if not live_class:
-            return Response({"status": "error", "message": "Not found"}, status=status.HTTP_404_NOT_FOUND)
-        live_class.delete()
-        return Response({"status": "success", "message": "Live class deleted successfully"})
+    # def delete(self, request, pk):
+    #     live_class = self.get_object(pk)
+    #     if not live_class:
+    #         return Response({"status": "error", "message": "Not found"}, status=status.HTTP_404_NOT_FOUND)
+    #     live_class.delete()
+    #     return Response({"status": "success", "message": "Live class deleted successfully"})
 
 
 
@@ -71,7 +78,7 @@ class CategoryListCreateAPIView(APIView):
 
 
     def post(self, request):
-        serializer = CategorySerializer(data=request.data)
+        serializer = CategorySerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             serializer.save()
             return Response({
@@ -92,15 +99,15 @@ class CategoryDetailAPIView(APIView):
 
     def get(self, request, pk):
         category = self.get_object(pk)
-        serializer = CategorySerializer(category)
+        serializer = CategorySerializer(category, context={'request': request})
         return Response({
             "status": "success",
             "data": serializer.data
         }, status=status.HTTP_200_OK)
 
-    def put(self, request, pk):
+    def patch(self, request, pk):
         category = self.get_object(pk)
-        serializer = CategorySerializer(category, data=request.data)
+        serializer = CategorySerializer(category, data=request.data, context={'request': request})
         if serializer.is_valid():
             serializer.save()
             return Response({
@@ -197,10 +204,20 @@ class VideoLessonDetailAPIView(APIView):
     def get(self, request, pk):
         video = self.get_object(pk)
         serializer = VideoLessonSerializer(video)
+
+        # Fetch related videos from the same category, excluding current video
+        related_videos = VideoLesson.objects.filter(
+            category=video.category
+        ).exclude(id=video.id)
+
+        related_serializer = VideoLessonSerializer(related_videos, many=True)
+
         return Response({
             "status": "success",
-            "data": serializer.data
+            "data": serializer.data,
+            "related_videos": related_serializer.data
         }, status=status.HTTP_200_OK)
+
 
     def put(self, request, pk):
         video = self.get_object(pk)

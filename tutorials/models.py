@@ -11,6 +11,7 @@ class LiveClass(models.Model):
     duration_minutes = models.PositiveIntegerField(null=True, blank=True)
     link = models.URLField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)
 
     def __str__(self):
         return self.title

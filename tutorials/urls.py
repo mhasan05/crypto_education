@@ -3,7 +3,7 @@ from .views import *
 
 urlpatterns = [
     path('live_classes/', LiveClassListCreateAPIView.as_view(), name='live_class_list_create'),
-    path('live_classes/<int:pk>/', LiveClassRetrieveUpdateDeleteAPIView.as_view(), name='live_class_rud'),
+    path('live_classes_update', LiveClassRetrieveUpdateDeleteAPIView.as_view(), name='live_class'),
     path('categories/', CategoryListCreateAPIView.as_view()),
     path('categories/<int:pk>/', CategoryDetailAPIView.as_view()),
     path('videos/', VideoLessonListCreateAPIView.as_view()),

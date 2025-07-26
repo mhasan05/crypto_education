@@ -208,7 +208,7 @@ class GoogleLoginAPIView(APIView):
 
 class AdminLoginView(APIView):
     """
-    Handle user login.
+    Handle Admin login.
     """
     def post(self, request):
         email = request.data.get('email')
@@ -218,15 +218,14 @@ class AdminLoginView(APIView):
             return Response({'status': 'error',"message": "Both email and password are required."}, status=status.HTTP_400_BAD_REQUEST)
 
         user = authenticate(request, email=email, password=password)
-
-        if user.is_superuser is False:
-            return Response({'status': 'error', "message": "You are not authorized to access this resource."}, status=status.HTTP_403_FORBIDDEN)
-
         if user is None:
             return Response({'status': 'error', "message": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
 
         if not user.is_active:
             return Response({'status': 'error', "message": "Your account is inactive."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not user.is_superuser:
+            return Response({'status': 'error', "message": "You are not authorized to access this resource."}, status=status.HTTP_403_FORBIDDEN)
 
         refresh = RefreshToken.for_user(user)
         access_token = refresh.access_token
