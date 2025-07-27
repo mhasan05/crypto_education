@@ -22,13 +22,25 @@ class UploadVideo(APIView):
             return Response({"detail": "No video file uploaded."}, status=400)
 
         video_id = str(uuid.uuid4())[:8]
-        video = Video.objects.create(video_id=video_id, file=file)
+
+        # Create video entry with file
+        video = Video.objects.create(
+            video_id=video_id,
+            file=file,
+        )
+
+        # Save filename and path after file is uploaded
+        video.video_filename = video.file.name.split('/')[-1]
+        video.video_path = video.file.name  # This is relative to MEDIA_ROOT
+        video.save()
 
         return Response({
             "message": "Video uploaded successfully",
             "video_id": video.video_id,
-            "object_id": video.id,  # Auto-generated primary key
-            "next_step": f"/api/v1/ai/process_video/{video.id}/"
+            "object_id": str(video.object_id),
+            "video_filename": video.video_filename,
+            "video_path": video.video_path,
+            "next_step": f"/api/v1/ai/process_video/{video.object_id}/"
         })
     
 

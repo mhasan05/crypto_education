@@ -47,21 +47,26 @@ def process_video_from_file(object_id: str):
         raise Exception("Video not found")
 
     video_id = video_obj.video_id
-    video_path = video_obj.video_path
     video_filename = video_obj.video_filename
+    relative_video_path = video_obj.video_path
 
-    if not os.path.exists(video_path):
+    # ✅ Combine MEDIA_ROOT with the relative path
+    absolute_video_path = os.path.join(settings.MEDIA_ROOT, relative_video_path)
+
+    if not os.path.exists(absolute_video_path):
         raise Exception("Video file not found")
 
-    # Extract original filename without video_id prefix
+    # ✅ Extract original filename (removes prefix like video_id)
     original_filename = "_".join(video_filename.split("_")[1:])
 
-    audio_path = os.path.splitext(video_path)[0] + ".wav"
-    extract_audio(video_path, audio_path)
+    # ✅ Extract audio and process transcription
+    audio_path = os.path.splitext(absolute_video_path)[0] + ".wav"
+    extract_audio(absolute_video_path, audio_path)
     segments = transcribe_whisper(audio_path)
     os.remove(audio_path)
 
-    pdf = UnicodePDF(video_id, str(video_obj.id), original_filename)
+    # ✅ Create subtitle PDF
+    pdf = UnicodePDF(video_id, str(video_obj.object_id), original_filename)
     pdf.add_font("DejaVu", "", FONT_FILE, uni=True)
     pdf.set_font("DejaVu", size=12)
     pdf.add_page()
@@ -75,6 +80,7 @@ def process_video_from_file(object_id: str):
     pdf_path = os.path.join(PDF_FOLDER, pdf_filename)
     pdf.output(pdf_path)
 
+    # ✅ Save to Subtitle model
     subtitle_obj = Subtitle.objects.create(
         video=video_obj,
         video_filename=original_filename,
@@ -83,4 +89,4 @@ def process_video_from_file(object_id: str):
         created_at=datetime.utcnow()
     )
 
-    return pdf_path, pdf_filename, subtitle_obj.id
+    return pdf_path, pdf_filename, subtitle_obj.object_id
