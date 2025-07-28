@@ -1,5 +1,6 @@
 from django.db import models
 import uuid
+from account.models import User
 
 class Video(models.Model):
     object_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -33,6 +34,7 @@ class GlobalPDF(models.Model):
 
 class GlobalChatSession(models.Model):
     object_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
     name = models.CharField(max_length=255, default="New Session")
     created_at = models.DateTimeField(auto_now_add=True)
     def __str__(self):

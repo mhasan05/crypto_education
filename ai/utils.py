@@ -4,8 +4,10 @@ from .models import Video, Subtitle
 from django.core.exceptions import ObjectDoesNotExist
 from django.conf import settings
 from fpdf import FPDF
+from PyPDF2 import PdfReader
 import ffmpeg
 import whisper
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 whisper_model = whisper.load_model("base")
 
 PDF_FOLDER = os.path.join(settings.BASE_DIR, "pdf_files")
@@ -90,3 +92,50 @@ def process_video_from_file(object_id: str):
     )
 
     return pdf_path, pdf_filename, subtitle_obj.object_id
+
+
+
+
+def extract_text_from_pdf_path(pdf_path):
+    if not os.path.exists(pdf_path):
+        raise FileNotFoundError("PDF file not found on server")
+    text = ""
+    with open(pdf_path, "rb") as f:
+        reader = PdfReader(f)
+        for page in reader.pages:
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text
+    return text
+
+
+def chunk_text(text, chunk_size=10000, chunk_overlap=1000):
+    splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+    return splitter.split_text(text)
+
+import uuid
+import chromadb
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+# ───────────── ChromaDB Setup ─────────────
+CHROMA_DB_DIR = "chroma_db"
+COLLECTION_NAME = "video_pdf_knowledge"
+GLOBAL_COLLECTION_NAME = "global_pdf_knowledge"
+VIDEO_CHAT_COLLECTION = "video_chat_memory"
+
+
+
+chroma_client = chromadb.PersistentClient(path=CHROMA_DB_DIR)
+collection = chroma_client.get_or_create_collection(name=COLLECTION_NAME)
+global_knowledge_collection = chroma_client.get_or_create_collection(name=GLOBAL_COLLECTION_NAME)
+video_chat_collection = chroma_client.get_or_create_collection(name=VIDEO_CHAT_COLLECTION)
+embeddings_model = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+def store_embeddings_for_pdf(object_id: str, text_chunks):
+    for chunk in text_chunks:
+        uid = str(uuid.uuid4())
+        embedding = embeddings_model.embed_documents([chunk])
+        collection.add(
+            documents=[chunk],
+            embeddings=embedding,
+            metadatas=[{"pdf_object_id": object_id}],
+            ids=[uid]
+        )
