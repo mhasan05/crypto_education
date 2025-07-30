@@ -1,6 +1,7 @@
 from django.db import models
 from account.models import User
 from storages.backends.s3boto3 import S3Boto3Storage
+import uuid
 
 s3 = S3Boto3Storage()
 
@@ -39,14 +40,23 @@ def video_upload_path(instance, filename):
 
 
 
+
+
+
 class VideoLesson(models.Model):
+    object_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    video_id = models.CharField(max_length=100, unique=True, default=uuid.uuid4)
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='videos')
     title = models.CharField(max_length=200)
     language = models.ForeignKey(Language, on_delete=models.SET_NULL, null=True, blank=True)
     video_file = models.FileField(upload_to=video_upload_path, blank=True, null=True, storage=s3)
+    video_filename = models.CharField(max_length=955, blank=True, null=True)
+    video_path = models.CharField(max_length=955, blank=True, null=True)
+    subtitle_object_id = models.UUIDField(null=True, blank=True)
     duration_seconds = models.PositiveIntegerField(null=True, blank=True)
     order = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['order']

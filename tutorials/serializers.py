@@ -33,7 +33,7 @@ class VideoLessonSerializer(serializers.ModelSerializer):
     language_name = serializers.CharField(source='language.name', read_only=True)
     class Meta:
         model = VideoLesson
-        fields = ['id', 'title', 'category', 'category_name', 'language', 'language_name', 'video_file', 'duration_seconds', 'order', 'created_at']
+        fields = '__all__'
 
 
 class CategoryWithVideosSerializer(serializers.ModelSerializer):

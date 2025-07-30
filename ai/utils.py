@@ -8,6 +8,15 @@ from PyPDF2 import PdfReader
 import ffmpeg
 import whisper
 from langchain.text_splitter import RecursiveCharacterTextSplitter
+import uuid
+import chromadb
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
+import random
+import string
+from tutorials.models import VideoLesson
+
+import tempfile
+import requests
 whisper_model = whisper.load_model("base")
 
 PDF_FOLDER = os.path.join(settings.BASE_DIR, "pdf_files")
@@ -44,30 +53,36 @@ class UnicodePDF(FPDF):
 
 def process_video_from_file(object_id: str):
     try:
-        video_obj = Video.objects.get(pk=object_id)
+        video_obj = VideoLesson.objects.get(pk=object_id)
     except ObjectDoesNotExist:
         raise Exception("Video not found")
 
     video_id = video_obj.video_id
     video_filename = video_obj.video_filename
-    relative_video_path = video_obj.video_path
+    video_url = video_obj.video_path  # it's a full S3 URL now
 
-    # ✅ Combine MEDIA_ROOT with the relative path
-    absolute_video_path = os.path.join(settings.MEDIA_ROOT, relative_video_path)
+    if not video_url.startswith("http"):
+        raise Exception("Invalid video URL")
 
-    if not os.path.exists(absolute_video_path):
-        raise Exception("Video file not found")
-
-    # ✅ Extract original filename (removes prefix like video_id)
-    original_filename = "_".join(video_filename.split("_")[1:])
+    # ✅ Download video to a temporary file
+    temp_video_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4")
+    response = requests.get(video_url, stream=True)
+    if response.status_code != 200:
+        raise Exception("Failed to download video from S3 URL")
+    
+    for chunk in response.iter_content(chunk_size=8192):
+        temp_video_file.write(chunk)
+    temp_video_file.close()
 
     # ✅ Extract audio and process transcription
-    audio_path = os.path.splitext(absolute_video_path)[0] + ".wav"
-    extract_audio(absolute_video_path, audio_path)
+    audio_path = os.path.splitext(temp_video_file.name)[0] + ".wav"
+    extract_audio(temp_video_file.name, audio_path)
     segments = transcribe_whisper(audio_path)
     os.remove(audio_path)
+    os.remove(temp_video_file.name)
 
-    # ✅ Create subtitle PDF
+    # ✅ Generate PDF
+    original_filename = "_".join(video_filename.split("_")[1:])
     pdf = UnicodePDF(video_id, str(video_obj.object_id), original_filename)
     pdf.add_font("DejaVu", "", FONT_FILE, uni=True)
     pdf.set_font("DejaVu", size=12)
@@ -113,9 +128,7 @@ def chunk_text(text, chunk_size=10000, chunk_overlap=1000):
     splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
     return splitter.split_text(text)
 
-import uuid
-import chromadb
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
+
 # ───────────── ChromaDB Setup ─────────────
 CHROMA_DB_DIR = "chroma_db"
 COLLECTION_NAME = "video_pdf_knowledge"
@@ -139,3 +152,44 @@ def store_embeddings_for_pdf(object_id: str, text_chunks):
             metadatas=[{"pdf_object_id": object_id}],
             ids=[uid]
         )
+
+
+def store_chat_message_in_chroma(role: str, content: str, session_id: str, video_object_id: str):
+    embedding = embeddings_model.embed_documents([content])
+    uid = str(uuid.uuid4())
+    video_chat_collection.add(
+        documents=[content],
+        embeddings=embedding,
+        metadatas=[{
+            "role": role,
+            "session_id": session_id,
+            "video_object_id": video_object_id
+        }],
+        ids=[uid]
+    )
+
+
+def get_chat_history_from_chroma(session_id: str, video_object_id: str, n_messages: int = 6):
+    results = video_chat_collection.get(
+        where={"session_id": session_id}
+    )
+
+    if not results or "documents" not in results:
+        return ""
+
+    # Reconstruct chat turns and sort by insertion order (Chroma preserves it)
+    docs = results["documents"]
+    metas = results["metadatas"]
+
+    messages = []
+    for doc, meta in zip(docs, metas):
+        if meta.get("video_object_id") == video_object_id:
+            role = meta.get("role", "user").capitalize()
+            messages.append(f"{role}: {doc.strip()}")
+
+    # Return last N messages
+    return "\n".join(messages[-n_messages:])
+
+def generate_session_id(length=12):
+    """Generates a random alphanumeric session ID."""
+    return ''.join(random.choices(string.ascii_letters + string.digits, k=length))

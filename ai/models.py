@@ -1,21 +1,12 @@
 from django.db import models
 import uuid
 from account.models import User
+from tutorials.models import VideoLesson
 
-class Video(models.Model):
-    object_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    video_id = models.CharField(max_length=16, unique=True)
-    file = models.FileField(upload_to='videos/')
-    video_filename = models.CharField(max_length=255, blank=True)
-    video_path = models.CharField(max_length=255, blank=True)
-    uploaded_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return self.video_id
 
 class Subtitle(models.Model):
     object_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    video = models.ForeignKey(Video, on_delete=models.CASCADE, related_name='subtitles')
+    video = models.ForeignKey(VideoLesson, on_delete=models.CASCADE, related_name='subtitles')
     video_filename = models.CharField(max_length=255)
     pdf_filename = models.CharField(max_length=255)
     transcript = models.JSONField()

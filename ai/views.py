@@ -1,7 +1,7 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser
-from rest_framework import status,permissions
+from rest_framework import status,permissions, parsers
 from .models import *
 import uuid
 from .serializers import *
@@ -11,42 +11,15 @@ from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
 from rest_framework.exceptions import NotFound, APIException
 from rest_framework.permissions import IsAuthenticated
+import random
+import string
+import uuid
+import google.generativeai as genai
+import re
+from django.db.models import Count
+from datetime import datetime, timedelta
 
-
-
-class UploadVideo(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-    parser_classes = [MultiPartParser]
-
-    def post(self, request):
-        file = request.FILES.get("video")
-        if not file:
-            return Response({"detail": "No video file uploaded."}, status=400)
-
-        video_id = str(uuid.uuid4())[:8]
-
-        # Create video entry with file
-        video = Video.objects.create(
-            video_id=video_id,
-            file=file,
-        )
-
-        # Save filename and path after file is uploaded
-        video.video_filename = video.file.name.split('/')[-1]
-        video.video_path = video.file.name  # This is relative to MEDIA_ROOT
-        video.save()
-
-        return Response({
-            "message": "Video uploaded successfully",
-            "video_id": video.video_id,
-            "object_id": str(video.object_id),
-            "video_filename": video.video_filename,
-            "video_path": video.video_path,
-            "next_step": f"/api/v1/ai/process_video/{video.object_id}/"
-        })
-    
-
-
+@method_decorator(csrf_exempt, name='dispatch')
 class PrintCollections(APIView):
     permission_classes = [permissions.IsAuthenticated]
     def get(self, request):
@@ -60,66 +33,8 @@ class PrintCollections(APIView):
             "videos": video_data,
             "subtitles": subtitle_data
         })
-    
 
 @method_decorator(csrf_exempt, name='dispatch')
-class ProcessFromFileAPIView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
-    def post(self, request, object_id):
-        try:
-            pdf_path, pdf_filename, subtitle_object_id = process_video_from_file(object_id)
-        except Exception as e:
-            return Response({"detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-
-        return Response({
-            "pdf_path": pdf_path,
-            "pdf_filename": pdf_filename,
-            "subtitle_object_id": str(subtitle_object_id)
-        })
-
-
-
-@method_decorator(csrf_exempt, name='dispatch')
-class LoadPDFPostgresToChroma(APIView):
-    # permission_classes = [IsAuthenticated]
-
-    def post(self, request, object_id):
-        print(f"Received object_id: {object_id}")
-        try:
-            # ✅ Fetch subtitle object from PostgreSQL using UUID
-            try:
-                subtitle = Subtitle.objects.get(object_id=object_id)
-            except Subtitle.DoesNotExist:
-                raise NotFound("Subtitle document not found in PostgreSQL")
-
-            pdf_filename = subtitle.pdf_filename
-            if not pdf_filename:
-                raise NotFound("PDF filename not found in Subtitle record")
-
-            pdf_path = os.path.join(PDF_FOLDER, pdf_filename)
-            print(f"PDF Path: {pdf_path}")
-            if not os.path.exists(pdf_path):
-                raise NotFound("PDF file not found on server")
-
-            # ✅ Extract, chunk, and store text
-            text = extract_text_from_pdf_path(pdf_path)
-            chunks = chunk_text(text)
-            store_embeddings_for_pdf(str(subtitle.object_id), chunks)
-
-            return Response({
-                "message": f"PDF text embedded and stored in ChromaDB for object_id {subtitle.object_id}"
-            })
-
-        except Exception as e:
-            raise APIException(f"Error processing PDF from PostgreSQL: {str(e)}")
-
-import random
-import string
-
-def generate_session_id(length=12):
-    """Generates a random alphanumeric session ID."""
-    return ''.join(random.choices(string.ascii_letters + string.digits, k=length))
-
 class CreateVideoChatSession(APIView):
 
     def post(self, request):
@@ -129,53 +44,7 @@ class CreateVideoChatSession(APIView):
             "message": "Session created successfully"
         })
 
-import uuid
-
-def store_chat_message_in_chroma(role: str, content: str, session_id: str, video_object_id: str):
-    embedding = embeddings_model.embed_documents([content])
-    uid = str(uuid.uuid4())
-    video_chat_collection.add(
-        documents=[content],
-        embeddings=embedding,
-        metadatas=[{
-            "role": role,
-            "session_id": session_id,
-            "video_object_id": video_object_id
-        }],
-        ids=[uid]
-    )
-
-
-
-def get_chat_history_from_chroma(session_id: str, video_object_id: str, n_messages: int = 6):
-    results = video_chat_collection.get(
-        where={"session_id": session_id}
-    )
-
-    if not results or "documents" not in results:
-        return ""
-
-    # Reconstruct chat turns and sort by insertion order (Chroma preserves it)
-    docs = results["documents"]
-    metas = results["metadatas"]
-
-    messages = []
-    for doc, meta in zip(docs, metas):
-        if meta.get("video_object_id") == video_object_id:
-            role = meta.get("role", "user").capitalize()
-            messages.append(f"{role}: {doc.strip()}")
-
-    # Return last N messages
-    print(messages[-n_messages:])
-    return "\n".join(messages[-n_messages:])
-
-
-
-
-import google.generativeai as genai
-import re
-
-@method_decorator(csrf_exempt, name='dispatch')  # disable CSRF if needed
+@method_decorator(csrf_exempt, name='dispatch')
 class AskQuestionFromVideo(APIView):
     def post(self, request, object_id):
         object_id = str(object_id).strip()
@@ -203,7 +72,7 @@ class AskQuestionFromVideo(APIView):
                     "👋 Hallo! Ich bin dein Krypto-Bildungsassistent. "
                     "Du kannst mich alles zu diesem Video fragen."
                 )
-                welcome_message = welcome_de if language == "de" else welcome_en
+                welcome_message = welcome_de if language == "german" else welcome_en
 
                 store_chat_message_in_chroma("user", question, session_id, object_id)
                 store_chat_message_in_chroma("assistant", welcome_message, session_id, object_id)
@@ -224,7 +93,7 @@ class AskQuestionFromVideo(APIView):
 
             language_instruction = (
                 "Please respond in German, regardless of the question language."
-                if language == "de"
+                if language == "german"
                 else "Please respond in English, regardless of the question language."
             )
 
@@ -251,9 +120,8 @@ Assistant: Provide a  clear, and summarize answer in paragraph. Don't print your
 
         except Exception as e:
             return Response({"detail": f"Error generating answer: {str(e)}"}, status=500)
-        
-from rest_framework import status, permissions, parsers
 
+@method_decorator(csrf_exempt, name='dispatch')
 class UploadGlobalPDFView(APIView):
     permission_classes = [permissions.AllowAny]
     parser_classes = [parsers.MultiPartParser]
@@ -316,9 +184,7 @@ class UploadGlobalPDFView(APIView):
             "uploaded": uploaded
         }, status=status.HTTP_200_OK)
 
-
-from django.db.models import Count
-
+@method_decorator(csrf_exempt, name='dispatch')
 class CreateGlobalChatSessionView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -342,10 +208,7 @@ class CreateGlobalChatSessionView(APIView):
         serializer = SessionSerializer(session)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-    
-
-
-
+@method_decorator(csrf_exempt, name='dispatch')
 class AskGlobalQuestionAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -353,7 +216,7 @@ class AskGlobalQuestionAPIView(APIView):
         try:
             question = request.data.get("question", "").strip()
             session_id = request.data.get("session_id", "").strip()
-            language = request.query_params.get("language", "en").lower()
+            language = request.query_params.get("language", "english").lower()
 
             if not question:
                 return Response({"detail": "Question cannot be empty."}, status=status.HTTP_400_BAD_REQUEST)
@@ -368,8 +231,8 @@ class AskGlobalQuestionAPIView(APIView):
             # Greeting logic
             if any(re.fullmatch(rf"{greet}[!., ]*", question.lower()) for greet in greetings):
                 welcome = {
-                    "en": "👋 Hello! I’m your Crypto Education Assistant. You can ask me anything.",
-                    "de": "👋 Hallo! Ich bin dein Krypto-Bildungsassistent. Du kannst mich alles fragen."
+                    "english": "👋 Hello! I’m your Crypto Education Assistant. You can ask me anything.",
+                    "german": "👋 Hallo! Ich bin dein Krypto-Bildungsassistent. Du kannst mich alles fragen."
                 }.get(language, "👋 Hello!")
 
                 empty_sessions = GlobalChatSession.objects.filter(user=request.user).annotate(message_count=Count('globalmessage')).filter(message_count=0)
@@ -389,7 +252,16 @@ class AskGlobalQuestionAPIView(APIView):
                 except Exception:
                     pass  # Ignore DB write errors for greetings
 
-                return Response({"answer": welcome})
+                
+                get_details = GlobalMessage.objects.filter(session_id=session, role="bot").order_by("-timestamp").first()
+
+                return Response({
+                    "object_id": get_details.object_id,
+                    "role": get_details.role,
+                    "content": get_details.content,
+                    "timestamp": get_details.timestamp,
+                    "session_id": session_id,
+                    })
 
             try:
                 session = GlobalChatSession.objects.get(object_id=session_id)
@@ -412,14 +284,14 @@ class AskGlobalQuestionAPIView(APIView):
 
             language_instruction = (
                 "Please respond in German, regardless of the question language."
-                if language == "de"
+                if language == "german"
                 else "Please respond in English, regardless of the question language."
             )
 
             prompt = f"""You are a helpful assistant answering user questions based on previous chat history and global knowledge base.
             {language_instruction}
 
-            Don't give answer if you don't have information on your knowledgebase or chat history. Don't use your own thinking if information is not available in your knowledgebase or chat history.
+            Always provide a confident and helpful answer. Do not mention whether the answer is from your knowledge base, chat history, or your own understanding. Just respond directly to the user's question with a clear and informative answer. if the user question is not related to crypto education, just say "I'm sorry, please ask a question related to crypto education. But users can ask normal questions too. like "what is your name or his/her name? how are you? etc.
 
             This is your knowledge base:
             {context}
@@ -449,23 +321,48 @@ class AskGlobalQuestionAPIView(APIView):
             except Exception:
                 pass
 
-            return Response({"answer": answer})
+            get_details = GlobalMessage.objects.filter(session_id=session, role="bot").order_by("-timestamp").first()
+
+            return Response({
+                "object_id": get_details.object_id,
+                "role": get_details.role,
+                "content": get_details.content,
+                "timestamp": get_details.timestamp,
+                "session_id": session_id,
+                })
 
         except Exception as e:
             return Response({"detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class GlobalSessionAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
+
     def get(self, request):
         user = request.user
-        sessions = GlobalChatSession.objects.filter(user=user).exclude(name="New Session").order_by("-created_at")
-        serialized = SessionSerializer(sessions, many=True)
-        return Response(serialized.data)
-    
+        today = datetime.now().date()
+        yesterday = today - timedelta(days=1)
 
+        # Filter sessions excluding "New Session"
+        sessions = GlobalChatSession.objects.filter(user=user).exclude(name="New Session")
 
+        # Separate into Today, Yesterday, Previous
+        today_sessions = sessions.filter(created_at__date=today).order_by("-created_at")
+        yesterday_sessions = sessions.filter(created_at__date=yesterday).order_by("-created_at")
+        previous_sessions = sessions.filter(created_at__date__lt=yesterday).order_by("-created_at")
+
+        # Serialize each group
+        serialized_today = SessionSerializer(today_sessions, many=True).data
+        serialized_yesterday = SessionSerializer(yesterday_sessions, many=True).data
+        serialized_previous = SessionSerializer(previous_sessions, many=True).data
+
+        return Response({
+            "today": serialized_today,
+            "yesterday": serialized_yesterday,
+            "previous": serialized_previous
+        })
+
+@method_decorator(csrf_exempt, name='dispatch')
 class SessionMessagesAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     def get(self, request, session_id):
@@ -477,9 +374,8 @@ class SessionMessagesAPIView(APIView):
         messages = GlobalMessage.objects.filter(session_id=session).order_by("timestamp")
         serialized = MessageSerializer(messages, many=True)
         return Response(serialized.data)
-    
 
-
+@method_decorator(csrf_exempt, name='dispatch')
 class RenameGlobalChatSessionAPIView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     def post(self, request, session_id):

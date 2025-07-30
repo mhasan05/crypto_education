@@ -5,6 +5,8 @@ from django.shortcuts import get_object_or_404
 from notifications.models import Notification
 from .models import *
 from .serializers import *
+from ai.utils import *
+from rest_framework.exceptions import NotFound, APIException
 
 
 class LiveClassListCreateAPIView(APIView):
@@ -144,31 +146,68 @@ class VideoLessonListCreateAPIView(APIView):
         }, status=status.HTTP_200_OK)
 
     def post(self, request):
-        serializer = VideoLessonSerializer(data=request.data)
-        if serializer.is_valid():
-            video = serializer.save()
+        try:
+            
+            serializer = VideoLessonSerializer(data=request.data)
+            if serializer.is_valid():
+                video = serializer.save()
 
-            # Trigger notification
-            users = User.objects.all()
-            notifications = [
-                Notification(
-                    user=user,
-                    video=video,
-                    message=f"New video uploaded in {video.category.name}: {video.title}"
-                )
-                for user in users
-            ]
-            Notification.objects.bulk_create(notifications)
+                object_id = video.object_id
+                video_update = VideoLesson.objects.get(object_id=object_id)
+                video_update.video_filename = video_update.video_file.name
+                video_update.video_path = video_update.video_file.url
+                video_update.save()
+
+                pdf_path, pdf_filename, subtitle_object_id = process_video_from_file(object_id)
+
+                try:
+                    # ✅ Fetch subtitle object from PostgreSQL using UUID
+                    subtitle = Subtitle.objects.get(object_id=subtitle_object_id)
+                    pdf_filename = subtitle.pdf_filename
+
+                    if not pdf_filename:
+                        raise NotFound("PDF filename not found in Subtitle record")
+
+                    pdf_path = os.path.join(PDF_FOLDER, pdf_filename)
+                    if not os.path.exists(pdf_path):
+                        raise NotFound("PDF file not found on server")
+
+                    # ✅ Extract, chunk, and store text
+                    text = extract_text_from_pdf_path(pdf_path)
+                    chunks = chunk_text(text)
+                    store_embeddings_for_pdf(str(subtitle.object_id), chunks)
+
+                except Exception as e:
+                    raise APIException(f"Error processing PDF from PostgreSQL: {str(e)}")
+                
+                video.subtitle_object_id = str(subtitle.object_id)
+                video.save()
+
+                # Trigger notification
+                users = User.objects.all()
+                notifications = [
+                    Notification(
+                        user=user,
+                        video=video,
+                        message=f"New video uploaded in {video.category.name}: {video.title}"
+                    )
+                    for user in users
+                ]
+                Notification.objects.bulk_create(notifications)
+
+                return Response({
+                    "status": "success",
+                    "data": serializer.data
+                }, status=status.HTTP_201_CREATED)
 
             return Response({
-                "status": "success",
-                "data": serializer.data
-            }, status=status.HTTP_201_CREATED)
+                "status": "error",
+                "data": serializer.errors
+            }, status=status.HTTP_400_BAD_REQUEST)
 
-        return Response({
-            "status": "error",
-            "data": serializer.errors
-        }, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"detail": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class CategoryWiseVideoListAPIView(APIView):
     def get(self, request):
