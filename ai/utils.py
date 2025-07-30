@@ -1,6 +1,6 @@
 import os
 from datetime import datetime
-from .models import Video, Subtitle
+from .models import *
 from django.core.exceptions import ObjectDoesNotExist
 from django.conf import settings
 from fpdf import FPDF
