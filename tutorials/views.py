@@ -67,6 +67,85 @@ class LiveClassRetrieveUpdateDeleteAPIView(APIView):
 
 
 
+
+
+
+
+
+class CourseListCreateAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def get(self, request):
+        categories = Course.objects.all()
+        serializer = CourseSerializer(categories, many=True, context={'request': request})
+        return Response({
+            "status": "success",
+            "data": serializer.data
+        }, status=status.HTTP_200_OK)
+
+
+    def post(self, request):
+        serializer = CourseSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                    "status": "success",
+                    "data": serializer.data,
+                }, status=status.HTTP_201_CREATED)
+        return Response({
+            "status": "error",
+            "data": serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+
+class CourseDetailAPIView(APIView):
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def get_object(self, pk):
+        return get_object_or_404(Course, pk=pk)
+
+    def get(self, request, pk):
+        course = self.get_object(pk)
+        serializer = CourseSerializer(course, context={'request': request})
+        return Response({
+            "status": "success",
+            "data": serializer.data
+        }, status=status.HTTP_200_OK)
+
+    def patch(self, request, pk):
+        course = self.get_object(pk)
+        serializer = CourseSerializer(course, data=request.data, context={'request': request})
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                "status": "success",
+                "data": serializer.data
+            }, status=status.HTTP_200_OK)
+        return Response({
+            "status": "error",
+            "data": serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk):
+        course = self.get_object(pk)
+        course.delete()
+        return Response({
+            "status": "success",
+            "data": "course deleted successfully"
+        }, status=status.HTTP_200_OK)
+
+
+
+
+
+
+
+
+
+
+
+
+
 class CategoryListCreateAPIView(APIView):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 

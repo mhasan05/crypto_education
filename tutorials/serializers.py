@@ -6,6 +6,13 @@ class LiveClassSerializer(serializers.ModelSerializer):
         model = LiveClass
         fields = '__all__'
 
+
+class CourseSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Course
+        fields = '__all__'
+
 class CategorySerializer(serializers.ModelSerializer):
     total_videos = serializers.SerializerMethodField()
     completed_videos = serializers.SerializerMethodField()

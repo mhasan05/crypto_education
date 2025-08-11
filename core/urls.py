@@ -27,4 +27,5 @@ urlpatterns = [
     path('api/v1/notifications/', include('notifications.urls')),
     path('api/v1/ai/', include('ai.urls')),
     path('api/v1/user/', include('feedback.urls')),
+    path("api/v1/subscriptions/", include("subscription.urls", namespace="subscription")),
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

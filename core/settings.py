@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     'social_django',
     'ai',
     'feedback',
+    'subscription',
 ]
 
 MIDDLEWARE = [
@@ -173,6 +174,16 @@ DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 # AWS_DEFAULT_ACL =  os.getenv('AWS_DEFAULT_ACL')
 # AWS_S3_VERIFY = os.getenv('AWS_S3_VERIFY')
 # DEFAULT_FILE_STORAGE = os.getenv('DEFAULT_FILE_STORAGE')
+
+
+
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
+STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY")
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
+
+STRIPE_PRICE_BASIC = os.getenv("STRIPE_PRICE_BASIC")
+STRIPE_PRICE_PRO = os.getenv("STRIPE_PRICE_PRO")
+STRIPE_PRICE_ELITE = os.getenv("STRIPE_PRICE_ELITE")
 
 
 AUTHENTICATION_BACKENDS = (

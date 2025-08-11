@@ -16,6 +16,14 @@ class LiveClass(models.Model):
 
     def __str__(self):
         return self.title
+    
+class Course(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(blank=True)
+    thumbnail = models.ImageField(upload_to='course_thumbnails/', blank=True, null=True, storage=s3)
+
+    def __str__(self):
+        return self.name
 
 class Category(models.Model):
     name = models.CharField(max_length=100, unique=True)
@@ -46,6 +54,7 @@ def video_upload_path(instance, filename):
 class VideoLesson(models.Model):
     object_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     video_id = models.CharField(max_length=100, unique=True, default=uuid.uuid4)
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='course_videos')
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='videos')
     title = models.CharField(max_length=200)
     language = models.ForeignKey(Language, on_delete=models.SET_NULL, null=True, blank=True)
