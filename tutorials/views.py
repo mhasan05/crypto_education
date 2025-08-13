@@ -316,17 +316,17 @@ class SingleCategoryVideoAPIView(APIView):
 class VideoLessonDetailAPIView(APIView):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
-    def get_object(self, pk):
+    def get_object(self, pk=None):
         return get_object_or_404(VideoLesson, pk=pk)
 
-    def get(self, request, pk):
+    def get(self, request, pk=None):
         video = self.get_object(pk)
         serializer = VideoLessonSerializer(video)
 
         # Fetch related videos from the same category, excluding current video
         related_videos = VideoLesson.objects.filter(
             category=video.category
-        ).exclude(id=video.id)
+        ).exclude(video_id=video.object_id)
 
         related_serializer = VideoLessonSerializer(related_videos, many=True)
 

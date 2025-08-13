@@ -13,13 +13,21 @@ class CourseSerializer(serializers.ModelSerializer):
         model = Course
         fields = '__all__'
 
+class VideoLessonSerializer(serializers.ModelSerializer):
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    language_name = serializers.CharField(source='language.name', read_only=True)
+    class Meta:
+        model = VideoLesson
+        fields = '__all__'
+
 class CategorySerializer(serializers.ModelSerializer):
+    videos = VideoLessonSerializer(many=True, read_only=True)
     total_videos = serializers.SerializerMethodField()
     completed_videos = serializers.SerializerMethodField()
 
     class Meta:
         model = Category
-        fields = ['id', 'name', 'description', 'thumbnail', 'total_videos', 'completed_videos']
+        fields = ['id', 'name', 'description', 'thumbnail', 'total_videos', 'completed_videos','videos']
 
     def get_total_videos(self, obj):
         return obj.videos.count()
@@ -35,12 +43,7 @@ class CategorySerializer(serializers.ModelSerializer):
         ).count()
 
 
-class VideoLessonSerializer(serializers.ModelSerializer):
-    category_name = serializers.CharField(source='category.name', read_only=True)
-    language_name = serializers.CharField(source='language.name', read_only=True)
-    class Meta:
-        model = VideoLesson
-        fields = '__all__'
+
 
 
 class CategoryWithVideosSerializer(serializers.ModelSerializer):
