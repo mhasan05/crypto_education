@@ -8,6 +8,8 @@ from .models import *
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework import status
+from .serializers import *
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
 
@@ -45,7 +47,20 @@ class CreateCheckoutSessionView(APIView):
     })
 
     def get(self, request, *args, **kwargs):
-        return Response({"error": "POST required"}, status=400)
+        user = request.user
+        subscription_details = Subscription.objects.filter(user=user).first()
+
+        if not subscription_details:
+            return Response(
+                {"status": "error", "message": "No subscription found for this user."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        serializer = SubscriptionSerializer(subscription_details)
+        return Response(
+            {"status": "success", "data": serializer.data},
+            status=status.HTTP_200_OK
+        )
 
 
 

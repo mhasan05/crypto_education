@@ -7,7 +7,7 @@ urlpatterns = [
     path('courses/', CourseListCreateAPIView.as_view()),
     path('courses/<int:pk>/', CourseDetailAPIView.as_view()),
 
-    path('categories/', CategoryListCreateAPIView.as_view()),
+    path('categories/courses/<int:pk>/', CategoryListCreateAPIView.as_view()),
     path('categories/<int:pk>/', CategoryDetailAPIView.as_view()),
     path('videos/', VideoLessonListCreateAPIView.as_view()),
     path('videos/<str:pk>/', VideoLessonDetailAPIView.as_view()),

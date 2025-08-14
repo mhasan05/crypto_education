@@ -149,8 +149,12 @@ class CourseDetailAPIView(APIView):
 class CategoryListCreateAPIView(APIView):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
 
-    def get(self, request):
-        categories = Category.objects.all()
+    def get(self, request, pk=None):
+        try:
+            course = Course.objects.get(id = pk)
+        except:
+            return Response({"status":"error","message":"Invalid course"})
+        categories = Category.objects.filter(course=course)
         serializer = CategorySerializer(categories, many=True, context={'request': request})
         return Response({
             "status": "success",
@@ -158,7 +162,7 @@ class CategoryListCreateAPIView(APIView):
         }, status=status.HTTP_200_OK)
 
 
-    def post(self, request):
+    def post(self, request, pk=None):
         serializer = CategorySerializer(data=request.data, context={'request': request})
         if serializer.is_valid():
             serializer.save()
