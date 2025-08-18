@@ -18,7 +18,7 @@ class GlobalPDF(models.Model):
     object_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     pdf_id = models.CharField(max_length=16, unique=True)
     pdf_filename = models.CharField(max_length=255)
-    pdf_path = models.FilePathField(path='global_pdfs')
+    pdf_path = models.FilePathField(path='global_pdfs', max_length=500)
     uploaded_at = models.DateTimeField(auto_now_add=True)
     def __str__(self):
         return str(self.object_id)
